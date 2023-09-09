@@ -1,0 +1,1 @@
+zellij --layout 'zellij run layout.kdl'

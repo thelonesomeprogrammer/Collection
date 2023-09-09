@@ -1,0 +1,3 @@
+curl -X POST -u "root:root" -H "NS: test" -H "DB: test" -H "Accept: application/json" -d "SELECT * FROM studio" http://localhost:80/sql
+
+docker run -p 80:8000 -v surral:/mydata surrealdb/surrealdb:latest start --log trace --user root --pass root file:mydatabase.db

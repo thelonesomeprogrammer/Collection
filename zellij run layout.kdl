@@ -1,0 +1,14 @@
+layout {
+    pane split_direction="horizontal" {
+        pane {
+            command "cargo"
+            args "watch" "-x run"
+            cwd "backend/"
+        }
+        pane { 
+            command "trunk"
+            args "watch"
+            cwd "ui/"
+        }
+    }
+}

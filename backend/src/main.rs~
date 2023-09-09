@@ -1,0 +1,110 @@
+
+#[macro_use]
+
+extern crate rocket;
+
+use serde::{Deserialize, Serialize};
+
+use rocket_seek_stream::SeekStream;
+use rocket::fs::NamedFile;
+use rocket::response::status::NotFound;
+use std::path::PathBuf;
+
+use std::borrow::Cow;
+
+use surrealdb::opt::auth::Root;
+use surrealdb::Surreal;
+use surrealdb::engine::remote::ws::Ws;
+
+use surrealdb::sql::{Thing,Strand};
+
+
+use rocket::{State, serde::{json::Json, json::Value}};
+#[derive(Serialize,Clone,Deserialize)]
+struct Person{
+    id:Thing,
+    user:Strand,
+    marketing:bool,
+    pass:Strand,
+    tags:Vec<Strand>
+}
+
+#[derive(Debug, Deserialize,Serialize,Clone)]
+struct Record {
+    #[allow(dead_code)]
+    id: Thing,
+}
+
+struct Rokct_db{
+    db:Surreal<surrealdb::engine::remote::ws::Client>,
+}
+// Return the index file as a Rocket NamedFile
+async fn get_index() -> Result<NamedFile, NotFound<String>> {
+    NamedFile::open("../ui/dist/index.html")
+        .await
+        .map_err(|e| NotFound(e.to_string()))
+}
+
+//Create a route for any url that is a path from the /
+#[get("/<path..>")]
+async fn static_files(path: PathBuf) -> Result<NamedFile, NotFound<String>> {
+    let path = PathBuf::from("../ui/dist").join(path);
+    match NamedFile::open(path).await {
+        Ok(f) => Ok(f),
+        Err(_) => get_index().await,
+    }
+}
+
+
+#[get("/data/<path..>")]
+async fn data(path: PathBuf) -> Result<NamedFile, NotFound<String>> {
+    let path = PathBuf::from("./data/").join(path);
+    match NamedFile::open(path).await {
+        Ok(f) => Ok(f),
+        Err(_) => get_index().await,
+    }
+}
+
+
+// Return the index when the url is /
+#[get("/")]
+async fn index() -> Result<NamedFile, NotFound<String>> {
+    get_index().await
+}
+
+// stream from a given filepath
+#[get("/vid/<path..>")]
+fn from_path<'a>(path: PathBuf) -> std::io::Result<SeekStream<'a>> {
+    let path = PathBuf::from("data/vid/").join(path);
+    SeekStream::from_path(path)
+}
+
+#[get("/matadata")]
+async fn videos(db:&State<Rokct_db>) -> Json<Vec<Record>> {
+    let query:Vec<Record> = db.db.select("person").await.unwrap();
+
+    Json(query.to_vec())
+}
+#[get("/matadata/<vid_id>")]
+async fn video_data(vid_id:String,db:&State<Rokct_db>) -> Json<Vec<Person>> {
+    let query: Vec<Person>= db.db.select("person").await.unwrap();
+
+    Json(query.to_vec())
+}
+
+#[launch]
+async fn rocket() -> _ {
+    let db = Surreal::new::<Ws>("127.0.0.1:80").await.expect("no db");
+    db.signin(Root {
+        username: "root",
+        password: "root",
+    })
+    .await.expect("sign in failed");
+    db.use_ns("test").use_db("test").await.expect("ns");
+
+
+    rocket::build()
+    .manage(Rokct_db{db})
+    .mount("/", routes![index,static_files,data,from_path,video_data,videos])
+    // You must mount the static_files route
+}
