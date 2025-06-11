@@ -4,14 +4,22 @@ use yew::prelude::*;
 use yew_router::prelude::Link;
 use crate::Route;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
-use web_sys::{Event, HtmlInputElement, InputEvent, HtmlElement, HtmlSelectElement};
+use web_sys::{Event, HtmlInputElement, InputEvent, HtmlElement, HtmlSelectElement, Window}; 
 
 use regex::Regex;
 
 use rand::thread_rng;
 use rand::seq::SliceRandom;
 
-
+struct passing {
+    vidshow: UseStateHandle<Vec<Video>>,
+    videos: UseStateHandle<Vec<Video>>,
+    vidfil: UseStateHandle<Vec<Video>>,
+}
+impl passing {
+    fn id(&self) -> u32 {45}
+    
+}
 
 #[derive(Deserialize, PartialEq,Clone,Debug)]
 pub struct Video {
@@ -104,35 +112,27 @@ pub fn vid() -> Html {
     let videos = use_state(|| vec![]);
     let vidfil = use_state(|| vec![]);
     let vidshow = use_state(|| vec![]);
+    let window = web_sys::window().unwrap();
 
-    {
-        let videos = videos.clone();
-        let vidfil = vidfil.clone();
-        let vidshow = vidshow.clone();
-        use_effect_with_deps(
-            move |_| {
-                let videos = videos.clone();
-                let vidfil = vidfil.clone();
-                let vidshow = vidshow.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    let fetched_videos: Vec<Video> = Request::get("/matadata/")
-                        .send()
-                        .await
-                        .unwrap()
-                        .json()
-                        .await
-                        .unwrap();
-                    let mut rvid = fetched_videos.to_vec();
-                    rvid.shuffle(&mut thread_rng());
-                    videos.set(rvid.clone());
-                    vidfil.set(rvid.clone());
-                    vidshow.set(if rvid.len() > 20 { rvid[(0)..20].to_vec()} else {rvid});
-                });
-                || ()
-            },
-            (),
-        );
-    }
+    let setsee = passing{videos:videos.clone(),vidshow:vidshow.clone(),vidfil:vidfil.clone()};
+    use_effect_with(setsee.id(),
+        move |_| {
+            wasm_bindgen_futures::spawn_local(async move {
+                let fetched_videos: Vec<Video> = Request::get("/matadata/")
+                    .send()
+                    .await
+                    .unwrap()
+                    .json()
+                    .await
+                    .unwrap();
+                let mut rvid = fetched_videos.to_vec();
+                rvid.shuffle(&mut thread_rng());
+                setsee.vidfil.set(rvid.clone());
+                setsee.videos.set(rvid.clone());
+                setsee.vidshow.set(if rvid.len() > 20 { rvid[(0)..20].to_vec()} else {rvid});
+            });
+        }
+    );
 
     let oninc = {
         let count = page.clone();
@@ -140,8 +140,12 @@ pub fn vid() -> Html {
         let page = *count+1;
         let vidfil = vidfil.clone();
         let vidshow = vidshow.clone();
+        let window = window.clone();
 
         Callback::from(move |_| {
+            window.scroll_to_with_x_and_y(0.0, 0.0);
+            web_sys::console::log_1(&(*vidshow).len().to_string().into());
+
             web_sys::console::log_1(&page.into());
             if (*vidfil).len() > showcaunt*page {
             count.set(page);
@@ -157,8 +161,10 @@ pub fn vid() -> Html {
         let showcaunt = *showcaunt;
         let vidfil = vidfil.clone();
         let vidshow = vidshow.clone();
+        let window = window.clone();
 
         Callback::from(move |e| {
+            window.scroll_to_with_x_and_y(0.0, 0.0);
             let r = get_value_from_mouse_event(e);
             web_sys::console::log_1(&r.clone().into());
             let page = r.clone().parse::<usize>().unwrap()-1;
@@ -175,8 +181,10 @@ pub fn vid() -> Html {
         let page = *count;
         let vidfil = vidfil.clone();
         let vidshow = vidshow.clone();
+        let window = window.clone();
 
         Callback::from(move |_| {
+            window.scroll_to_with_x_and_y(0.0, 0.0);
             web_sys::console::log_1(&page.into());
             if page > 0 {
                 let page = page-1;
@@ -242,7 +250,7 @@ pub fn vid() -> Html {
                     </select>
             </div>
             <div style="padding-top:50px; justify-content: space-around; grid-template-columns: auto auto auto auto; row-gap: 0.125vw; display:grid; justify-items:center;" >
-            <VideosList videos={if (*vidfil).len() > 0 {if (*vidfil).len() > *showcaunt  + *showcaunt * *page{(*vidfil)[(*page * *showcaunt)..((*page + 1) * *showcaunt)].to_vec()} else {(*vidfil)[(*page * *showcaunt)..((*vidfil).len()-1)].to_vec()}} else {vec![]}} />
+            <VideosList videos={if (*vidfil).len() > 0 {if (*vidfil).len() > *showcaunt  + *showcaunt * *page{(*vidfil)[(*page * *showcaunt)..((*page + 1) * *showcaunt)].to_vec()} else {(*vidfil)[(*page * *showcaunt)..((*vidfil).len())].to_vec()}} else {vec![]}} />
             </div>
             <div style="justify-content: center;display:flex;align-content: center;height: 50px;padding: 5px;" >
                 <ul style = "display: flex; text-decoration: none; list-style: none; flex-wrap: wrap; align-content: center;" >

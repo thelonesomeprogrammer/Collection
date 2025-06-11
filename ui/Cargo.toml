@@ -7,14 +7,14 @@ edition = "2021"
 #Our common code library
 common = {path = "../common"}
 #The frontend framework we are going to use
-yew = { version = "0.20", features = ["csr"] }
+yew = { version = "0.21", features = ["csr"] }
 #Yew's routing framework for handling url on the frontend
-yew-router = "0.17.0"
+yew-router = "0.18.0"
 #Logging for Debugging
 wasm-logger = "0.2.0"
 log = "0.4.14"
 #A WebAssembly bindgen
-web-sys = "0.3.56"
+web-sys = { version = "0.3.66", features = ["Window","HtmlSelectElement"]}
 gloo-net = "0.2"
 #Reqwasm will be used to send request to the backend
 reqwasm = "0.5.0"
@@ -23,7 +23,9 @@ serde = { version = "1.0.133", features = ["derive"] }
 
 regex = "1.9.1"
 
+getrandom = { version = "0.2", features = ["js"] }
+
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4"
-patternfly-yew = "0.4.1"
 rand = "0.8.5"
+

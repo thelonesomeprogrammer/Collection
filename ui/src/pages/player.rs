@@ -21,26 +21,24 @@ pub fn player(props: &Props) -> Html {
         plot: "".to_string(),
         img: "".to_string(),
     });
-    {
-        let video = video.clone();
-        use_effect_with_deps(
-            move |_| {
-                let video = video.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    let fetched_video: Video = Request::get(&url)
-                        .send()
-                        .await
-                        .unwrap()
-                        .json()
-                        .await
-                        .unwrap();
-                    video.set(fetched_video);
-                });
-                || ()
-            },
-            (),
-        );
-    }
+
+    let ved = video.clone();
+    use_effect_with(ved.clone(),
+        move |_| {
+            wasm_bindgen_futures::spawn_local(async move {
+                let fetched_video: Video = Request::get(&url)
+                    .send()
+                    .await
+                    .unwrap()
+                    .json()
+                    .await
+                    .unwrap();
+                ved.set(fetched_video);
+            });
+        }
+    );
+
+
     return html! {
         <div style="
         padding-top:80px;
@@ -54,15 +52,18 @@ pub fn player(props: &Props) -> Html {
             <div>
                 <h1>{(*video).title.clone()}</h1>
             </div>
-            <video style="max-height: 80vh; max-width: 80vw" controls=true src={format!("/vid/{}",(*video).filename.clone())} type="video/mp4"/>
+            <video style="max-height: 80vh; max-width: 80vw" id = {(*video).filename.clone()} controls=true src={if (*video).filename.clone() != "".to_string() {format!("/vid/{}",(*video).filename.clone())}else{"".to_string()}} type="video/mp4"/>
             <div>
                 <ul style="list-style-type: none;">
                     <li>
+                        <google-cast-launcher></google-cast-launcher>
                         {(*video).date.clone()}
                     </li>
                 </ul>
                 </div>
             </div>
+            <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+            <script src="/data/js/ch.js"></script>
         </div>
     };
 }

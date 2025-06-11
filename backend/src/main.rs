@@ -1,127 +1,132 @@
-
 #[macro_use]
-
 extern crate rocket;
 
 use serde::{Deserialize, Serialize};
 
-use rocket_seek_stream::SeekStream;
 use rocket::fs::NamedFile;
 use rocket::response::status::NotFound;
+use rocket_seek_stream::SeekStream;
 use std::path::PathBuf;
 
-
+use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
-use surrealdb::engine::remote::ws::Ws;
 
-use surrealdb::sql::{Thing,Strand,Datetime,Number};
+use surrealdb::sql::{Datetime, Number, Strand, Thing};
 
+use rocket::{serde::json::Json, State};
 
-use rocket::{State, serde::{json::Json}};
+use std::thread;
 
-
-
-#[derive(Serialize,Clone,Deserialize)]
+#[derive(Serialize, Clone, Deserialize)]
 struct Featuring {
-    out:Vec<Model>
+    out: Vec<Model>,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
+#[derive(Serialize, Clone, Deserialize)]
 struct made_by {
-    out:Vec<Model>
+    out: Vec<Model>,
 }
 
-
-#[derive(Serialize,Clone,Deserialize)]
-struct Creater{
-    id:Option<Thing>,
-    description:Option<Strand>,
-    network:Option<Strand>,
-    url:Option<Strand>,
-    logo:Option<Strand>,
-    name:Option<Strand>,
-
+#[derive(Serialize, Clone, Deserialize)]
+struct Creater {
+    id: Option<Thing>,
+    description: Option<Strand>,
+    network: Option<Strand>,
+    url: Option<Strand>,
+    logo: Option<Strand>,
+    name: Option<Strand>,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
-struct Model{
-    id:Thing,
-    name:Strand,
-    gender:Option<Strand>,
-    birthday:Option<Strand>,
-    nationality:Option<Strand>,
-    ethnicity:Option<Strand>,
-    haircolor:Option<Strand>,
-    eye_colour:Option<Strand>,
-//    height:Option<Strand>,
-//    weight:Option<Strand>,
-    fakeboobs:Option<bool>,
-    birthplace:Option<Strand>,
-    cupsize:Option<Vec<Strand>>,
-    bio:Option<Strand>,
-    measurements:Option<Strand>,
+#[derive(Serialize, Clone, Deserialize)]
+struct Model {
+    id: Thing,
+    name: Strand,
+    gender: Option<Strand>,
+    birthday: Option<Strand>,
+    nationality: Option<Strand>,
+    ethnicity: Option<Strand>,
+    haircolor: Option<Strand>,
+    eye_colour: Option<Strand>,
+    //    height:Option<Strand>,
+    //    weight:Option<Strand>,
+    fakeboobs: Option<bool>,
+    birthplace: Option<Strand>,
+    cupsize: Option<Vec<Number>>,
+    bio: Option<Strand>,
+    measurements: Option<Strand>,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
-struct Scene{
-    id:Thing,
-    filename:Strand,
-    title:Strand,
-    url:Strand,
+#[derive(Serialize, Clone, Deserialize)]
+struct Scene {
+    id: Thing,
+    filename: Strand,
+    title: Strand,
+    url: Strand,
     //date:Datetime,
-    date:Strand,
-    plot:Strand,
-    img:Strand,
+    date: Strand,
+    plot: Strand,
+    img: Strand,
+    //rating:Number,
+}
+#[derive(Serialize, Clone, Deserialize)]
+struct SendScene {
+    id: String,
+    filename: String,
+    title: String,
+    url: String,
+    //date:Datetime,
+    date: String,
+    plot: String,
+    img: String,
     //rating:Number,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
-struct tag{
-    id:Thing,
+#[derive(Serialize, Clone, Deserialize)]
+struct tag {
+    id: Thing,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
-struct Preformere{
-    id:Thing,
-    name:Strand,
-    gender:Strand,
-    birthday:Datetime,
-    nationality:Strand,
-    ethnicity:Strand,
-    haircolor:Strand,
-    eye_colour:Strand,
-    height:Number,
-    weight:Number,
-    fakeboobs:bool,
-    birthplace:Strand,
-    cupsize:Vec<Number>,
-    bio:Strand,
-    measurements:Strand,
+#[derive(Serialize, Clone, Deserialize)]
+struct Preformere {
+    id: Thing,
+    name: Strand,
+    gender: Strand,
+    birthday: Datetime,
+    nationality: Strand,
+    ethnicity: Strand,
+    haircolor: Strand,
+    eye_colour: Strand,
+    height: Number,
+    weight: Number,
+    fakeboobs: bool,
+    birthplace: Strand,
+    cupsize: Vec<Number>,
+    bio: Strand,
+    measurements: Strand,
 }
 
-#[derive(Serialize,Clone,Deserialize)]
-struct Studios{
-    id:Thing,
-    description:Strand,
-    network:Strand,
-    url:Strand,
-    logo:Strand,
-
+#[derive(Serialize, Clone, Deserialize)]
+struct Studios {
+    id: Thing,
+    description: Strand,
+    network: Strand,
+    url: Strand,
+    logo: Strand,
 }
 
-#[derive(Debug, Deserialize,Serialize,Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct Record {
     #[allow(dead_code)]
     id: Thing,
 }
 
-struct RokctDb{
-    db:Surreal<surrealdb::engine::remote::ws::Client>,
+struct RokctDb {
+    db: Surreal<surrealdb::engine::remote::ws::Client>,
 }
 // Return the index file as a Rocket NamedFile
 async fn get_index() -> Result<NamedFile, NotFound<String>> {
-    NamedFile::open("../ui/dist/index.html")
+    NamedFile::open("/collection/ui/index.html")
         .await
         .map_err(|e| NotFound(e.to_string()))
 }
@@ -129,23 +134,21 @@ async fn get_index() -> Result<NamedFile, NotFound<String>> {
 //Create a route for any url that is a path from the /
 #[get("/<path..>")]
 async fn static_files(path: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = PathBuf::from("../ui/dist").join(path);
+    let path = PathBuf::from("/collection/ui/").join(path);
     match NamedFile::open(path).await {
         Ok(f) => Ok(f),
         Err(_) => get_index().await,
     }
 }
-
 
 #[get("/data/<path..>")]
 async fn data(path: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = PathBuf::from("./data/").join(path);
+    let path = PathBuf::from("/collection/backend/").join(path);
     match NamedFile::open(path).await {
         Ok(f) => Ok(f),
         Err(_) => get_index().await,
     }
 }
-
 
 // Return the index when the url is /
 #[get("/")]
@@ -156,38 +159,94 @@ async fn index() -> Result<NamedFile, NotFound<String>> {
 // stream from a given filepath
 #[get("/vid/<path..>")]
 fn from_path<'a>(path: PathBuf) -> std::io::Result<SeekStream<'a>> {
-    let path = PathBuf::from("/home/marrinus/website-data/").join(path);
+    let path = PathBuf::from("/data").join(path);
     SeekStream::from_path(path)
 }
 
 #[get("/matadata")]
-async fn videos(db:&State<RokctDb>) -> Json<Vec<Scene>> {
-    let mut query = db.db.query("SELECT ->made_by.out.*,->featuring.out.*,* FROM scene").await.unwrap();
-    let model:Vec<Featuring> = query.take("->featuring").unwrap();
-    let stu:Vec<Creater> = query.take("->made_by").unwrap();
-    let scenedata:Vec<Scene> = query.take(0).unwrap();
-    Json(scenedata.to_vec())
+async fn videos(db: &State<RokctDb>) -> Json<Vec<SendScene>> {
+    let mut query = db
+        .db
+        .query("SELECT ->made_by.out.*,->featuring.out.*,* FROM scene")
+        .await
+        .unwrap();
+    //let model:Vec<Featuring> = query.take("->featuring").unwrap();
+    // let stu:Vec<Creater> = query.take("->made_by").unwrap();
+    let scenedata: Vec<Scene> = query.take(0).unwrap();
+    let mut sendata = vec![];
+    for i in scenedata.iter() {
+        sendata.push(SendScene {
+            id: i.id.id.to_string().as_str().replace("'", "").to_string(),
+            filename: i.filename.to_string().as_str().replace("'", "").to_string(),
+            title: i.title.to_string().as_str().replace("'", "").to_string(),
+            url: i.url.to_string().as_str().replace("'", "").to_string(),
+            date: i.date.to_string().as_str().replace("'", "").to_string(),
+            plot: i.plot.to_string().as_str().replace("'", "").to_string(),
+            img: i.img.to_string().as_str().replace("'", "").to_string(),
+        });
+    }
+    Json(sendata.to_vec())
 }
 #[get("/matadata/<vid_id>")]
-async fn video_data(vid_id:String,db:&State<RokctDb>) -> Json<Scene> {
-    let query: Scene= db.db.select(("scene",vid_id)).await.unwrap();
-
-    Json(query.clone())
+async fn video_data(vid_id: String, db: &State<RokctDb>) -> Json<SendScene> {
+    let query: Scene = db.db.select(("scene", vid_id)).await.unwrap().unwrap();
+    Json(SendScene {
+        id: query
+            .id
+            .id
+            .to_string()
+            .as_str()
+            .replace("'", "")
+            .to_string(),
+        filename: query
+            .filename
+            .to_string()
+            .as_str()
+            .replace("'", "")
+            .to_string(),
+        title: query
+            .title
+            .to_string()
+            .as_str()
+            .replace("'", "")
+            .to_string(),
+        url: query.url.to_string().as_str().replace("'", "").to_string(),
+        date: query.date.to_string().as_str().replace("'", "").to_string(),
+        plot: query.plot.to_string().as_str().replace("'", "").to_string(),
+        img: query.img.to_string().as_str().replace("'", "").to_string(),
+    })
 }
 
 #[launch]
 async fn rocket() -> _ {
-    let db = Surreal::new::<Ws>("127.0.0.1:80").await.expect("no db");
+    let mut res = Surreal::new::<Ws>("127.0.0.1:8000").await;
+
+    if res.is_err() {
+        for _ in 1..3 {
+            res = Surreal::new::<Ws>("127.0.0.1:8000").await;
+            if res.is_err() {
+                thread::sleep_ms(2000);
+                continue;
+            }
+            break;
+        }
+    }
+    if res.is_err() {
+        panic!("no db")
+    }
+    let db = res.unwrap();
+
     db.signin(Root {
         username: "root",
         password: "root",
     })
-    .await.expect("sign in failed");
+    .await
+    .expect("sign in failed");
     db.use_ns("test").use_db("test").await.expect("ns");
 
-
-    rocket::build()
-    .manage(RokctDb{db})
-    .mount("/", routes![index,static_files,data,from_path,video_data,videos])
+    rocket::build().manage(RokctDb { db }).mount(
+        "/",
+        routes![index, static_files, data, from_path, video_data, videos],
+    )
     // You must mount the static_files route
 }
